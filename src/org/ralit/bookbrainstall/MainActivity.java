@@ -25,6 +25,7 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Mat;
 import org.opencv.imgproc.Imgproc;
 
+import android.R.color;
 import android.animation.Animator;
 import android.animation.Animator.AnimatorListener;
 import android.animation.AnimatorSet;
@@ -86,6 +87,8 @@ public class MainActivity extends Activity implements AnimatorListener{
 	private Paint frame;
 	private Paint number;
 	private Paint marker;
+	private Canvas canvas;
+	private Canvas markerCanvas;
 	ObjectAnimator fadein;
 	ObjectAnimator fadeout;
 	ObjectAnimator move;
@@ -175,15 +178,24 @@ public class MainActivity extends Activity implements AnimatorListener{
 	private final SimpleOnGestureListener gestureListener = new SimpleOnGestureListener() {
 		@Override
 		public boolean onFling(MotionEvent ev1, MotionEvent ev2, float vx, float vy) {
-				if (Math.abs(ev1.getY() - ev2.getY()) > 250) { return false; }
-				if (ev2.getX() - ev1.getX() > 120 && Math.abs(vx) > 200) {
+				if (ev1.getY() > dH && ev2.getY() > dH) {
+					marker.setColor(Color.RED);
+					marker.setAlpha(64);
+					Rect rect = new Rect(pos.get(index).get(0), pos.get(index).get(1), pos.get(index).get(2), pos.get(index).get(3));
+					markerCanvas.drawRect(rect, marker);
+					float w = (float) mutableBitmap.getWidth();
+					float h = (float) mutableBitmap.getHeight();
+					markedPage = Bitmap.createScaledBitmap(markerBitmap, (int)dW, (int)(dW * (h/w)), false);
+					markerview.setImageBitmap(markedPage);
+				} else if (Math.abs(ev1.getY() - ev2.getY()) > 250) { 
+					return false; 
+				} else if (ev2.getX() - ev1.getX() > 120 && Math.abs(vx) > 200) {
 					back = true;
 					if (set.getChildAnimations().get(0).isRunning()) { 
 						if (index > 0) { --index; }
 					}
 					set.cancel();
-				}
-				if (ev1.getX() - ev2.getX() > 120 && Math.abs(vx) > 200) {
+				} else if (ev1.getX() - ev2.getX() > 120 && Math.abs(vx) > 200) {
 					set.cancel();
 				}
 			return false;
@@ -511,8 +523,8 @@ public class MainActivity extends Activity implements AnimatorListener{
 //		Log.i(tag, "w: " + w + ", h: " + h + ", viewh: " + viewh);
 		markerBitmap = Bitmap.createBitmap(mutableBitmap.getWidth(), mutableBitmap.getHeight(), Bitmap.Config.ARGB_8888);
 		
-		Canvas canvas = new Canvas(mutableBitmap);
-		Canvas markerCanvas = new Canvas(markerBitmap);
+		canvas = new Canvas(mutableBitmap);
+		markerCanvas = new Canvas(markerBitmap);
 		for (int i = 0; i < pos.size(); ++i) {
 			Rect rect = new Rect(pos.get(i).get(0), pos.get(i).get(1), pos.get(i).get(2), pos.get(i).get(3));
 			canvas.drawRect(rect, frame);
