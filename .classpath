@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="gen"/>
+	<classpathentry exported="true" kind="con" path="com.android.ide.eclipse.adt.ANDROID_FRAMEWORK"/>
+	<classpathentry exported="true" kind="con" path="com.android.ide.eclipse.adt.LIBRARIES"/>
+	<classpathentry exported="true" kind="con" path="com.android.ide.eclipse.adt.DEPENDENCIES"/>
+	<classpathentry exported="true" kind="lib" path="/Users/ralit/Downloads/Docomo/commons-logging-1.1.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="/Users/ralit/Downloads/Docomo/httpclient-4.1.3.jar"/>
+	<classpathentry exported="true" kind="lib" path="/Users/ralit/Downloads/Docomo/httpcore-4.1.4.jar"/>
+	<classpathentry exported="true" kind="lib" path="/Users/ralit/Downloads/Docomo/jp.recognize-api-1.6-javadoc.jar"/>
+	<classpathentry exported="true" kind="lib" path="/Users/ralit/Downloads/Docomo/jp.recognize-api-1.6.jar"/>
+	<classpathentry exported="true" kind="lib" path="/Users/ralit/Downloads/Docomo/json-20080701.jar"/>
+	<classpathentry kind="output" path="bin/classes"/>
+</classpath>
