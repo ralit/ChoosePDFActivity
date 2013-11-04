@@ -11,8 +11,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 
-import com.artifex.mupdfdemo.MuPDFCore;
-
 import jp.recognize.HttpSceneryLineLayoutAnalysisRequest;
 import jp.recognize.SceneryLineLayoutAnalyzer;
 import jp.recognize.client.HttpSceneryLineLayoutAnalyzer;
@@ -20,6 +18,13 @@ import jp.recognize.common.ImageContentType;
 import jp.recognize.common.RecognitionResult.LineLayout;
 import jp.recognize.common.Shape.Rectangle;
 import jp.recognize.common.client.HttpSceneryRecognitionRequest.InputStreamImageContent;
+
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
+
 import android.animation.Animator;
 import android.animation.Animator.AnimatorListener;
 import android.animation.AnimatorSet;
@@ -31,18 +36,15 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.PointF;
 import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Environment;
-import android.util.Config;
 import android.util.Log;
 import android.util.TimingLogger;
 import android.view.GestureDetector;
 import android.view.GestureDetector.SimpleOnGestureListener;
 import android.view.MotionEvent;
-import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.animation.LinearInterpolator;
@@ -51,12 +53,16 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.LinearLayout.LayoutParams;
 
+import com.artifex.mupdfdemo.MuPDFCore;
+
 public class MainActivity extends Activity implements AnimatorListener{
 	
 	private LinearLayout linearlayout;
 	private FrameLayout framelayout2;
 	private FrameLayout framelayout;
 	private FrameLayout rootframe;
+	private FrameLayout markerframe;
+	private ImageView markerview;
 	private ImageView image;
 	private ImageView image2;
 	private ImageView select;
@@ -74,9 +80,12 @@ public class MainActivity extends Activity implements AnimatorListener{
 	private Bitmap bmp;
 	private Bitmap mutableBitmap;
 	private Bitmap page;
+	private Bitmap markedPage;
+	private Bitmap markerBitmap;
 	ArrayList<ArrayList<Integer>> pos = new ArrayList<ArrayList<Integer>>();
 	private Paint frame;
 	private Paint number;
+	private Paint marker;
 	ObjectAnimator fadein;
 	ObjectAnimator fadeout;
 	ObjectAnimator move;
@@ -181,16 +190,43 @@ public class MainActivity extends Activity implements AnimatorListener{
 		}
 	};
 	
+	@Override
+	public void onResume() {
+		super.onResume();
+		OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_2_4_6, this, mLoaderCallback);
+	}
+	
+	private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
+		@Override
+		public void onManagerConnected(int status) {
+			switch (status) {
+				case LoaderCallbackInterface.SUCCESS: {
+					Log.i(tag, "OpenCV loaded successfully");
+					break;
+				}
+				default: {
+					super.onManagerConnected(status);
+					break;
+				}
+			}
+		}
+	};
+
+
 	private void expand() {
 		Log.i(tag, "expand()");
 		TimingLogger timing = new TimingLogger(tag, "timinglogger");
 		
+		long start = System.currentTimeMillis();
 		int ww = bmp.getWidth();
 		int hh = bmp.getHeight(); 
 		int pixels[] = new int[ww * hh];
 		bmp.getPixels(pixels, 0, ww, 0, 0, ww, hh);
-		timing.addSplit("getpixels");
+		long end = System.currentTimeMillis();
+		Log.i(tag, "getPixels(): " + (end - start));
 		
+//		timing.addSplit("getpixels");
+		start = System.currentTimeMillis();
 		for (int i = 0; i < pos.size(); ++i) {
 			ArrayList<Integer> array = pos.get(i);
 			int y = (array.get(3) + array.get(1)) / 2;
@@ -205,9 +241,21 @@ public class MainActivity extends Activity implements AnimatorListener{
 			if (newL != -1) { array.set(0, newL - margin > 0 ? (int)(newL - margin) : 0); }
 			if (newR != -1) { array.set(2, newR + margin < ww ? (int)(newR + margin) : ww-1); }
 		}
-		timing.addSplit("pixel走査");
-		timing.dumpToLog();
+		end = System.currentTimeMillis();
+		Log.i(tag, "pixel走査: " + (end - start));
+//		timing.addSplit("pixel走査");
+//		timing.dumpToLog();
 		Log.i(tag, timing.toString());
+	}
+	
+	private void expandcv() {
+		int ww = bmp.getWidth();
+		int hh = bmp.getHeight(); 
+		int pixels[] = new int[ww * hh];
+		bmp.getPixels(pixels, 0, ww, 0, 0, ww, hh);
+		
+		Mat mat = new Mat();
+		mat.get(hh, ww, pixels);
 	}
 	
 	private void deleteDuplicate() {
@@ -256,7 +304,14 @@ public class MainActivity extends Activity implements AnimatorListener{
 		overview = new ImageView(this);
 		framelayout.addView(image);
 		framelayout.addView(image2);
-		framelayout2.addView(overview);
+//		framelayout2.addView(overview);
+		markerview = new ImageView(this);
+		markerframe = new FrameLayout(this);
+		framelayout2.addView(markerframe);
+		markerframe.addView(overview);
+		markerframe.addView(markerview);
+//		overview.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+//		markerview.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 	}
 	
 	public void fadeinNowloading() {
@@ -301,8 +356,10 @@ public class MainActivity extends Activity implements AnimatorListener{
 		float w = mutableBitmap.getWidth();
 		float linemid = (pos.get(index).get(3) + pos.get(index).get(1)) / 2;
 		float distance = h / 2 - linemid;
-		float i = distance * (overview.getWidth() / w);
-		ObjectAnimator anim = ObjectAnimator.ofFloat(overview, "y", i);
+//		float i = distance * (overview.getWidth() / w);
+//		ObjectAnimator anim = ObjectAnimator.ofFloat(overview, "y", i);
+		float i = distance * (markerframe.getWidth() / w);
+		ObjectAnimator anim = ObjectAnimator.ofFloat(markerframe, "y", i);
 		anim.setDuration(1000);
 		anim.start();
 	}
@@ -343,14 +400,20 @@ public class MainActivity extends Activity implements AnimatorListener{
 		float small_w = w * ratio;
 		float scale_ratio = dW / small_w;
 		page = Bitmap.createScaledBitmap(mutableBitmap, (int)dW, (int)(dW * (h/w)), false);
+		markedPage = Bitmap.createScaledBitmap(markerBitmap, (int)dW, (int)(dW * (h/w)), false);
 		overview.setImageBitmap(page);
+		markerview.setImageBitmap(markedPage);
 
-		overview.setScaleX(scale_ratio);
-		overview.setScaleY(scale_ratio);
+//		overview.setScaleX(scale_ratio);
+//		overview.setScaleY(scale_ratio);
+		markerframe.setScaleX(scale_ratio);
+		markerframe.setScaleY(scale_ratio);
 		float linemid = (pos.get(index).get(3) + pos.get(index).get(1)) / 2;
 		float distance = h / 2 - linemid;
-		float i = distance * (overview.getWidth() / w);
-		overview.setY(i);
+//		float i = distance * (overview.getWidth() / w);
+//		overview.setY(i);
+		float i = distance * (markerframe.getWidth() / w);
+		markerframe.setY(i);
 		Log.i(tag, "i: " + i);
 	}
 	
@@ -434,13 +497,29 @@ public class MainActivity extends Activity implements AnimatorListener{
 		number.setColor(Color.RED);
 		number.setStrokeWidth(1);
 		number.setTextSize(20);
+		marker = new Paint();
+		marker.setStyle(Style.FILL_AND_STROKE);
+		marker.setColor(Color.YELLOW);
+		marker.setStrokeWidth(1);
+		marker.setAlpha(64);
 		mutableBitmap = bmp.copy(bmp.getConfig(), true);
+		
+		prepare_image();
+//		float w = (float) mutableBitmap.getWidth();
+//		float h = (float) mutableBitmap.getHeight();
+//		float viewh = dW * (h/w);
+//		Log.i(tag, "w: " + w + ", h: " + h + ", viewh: " + viewh);
+		markerBitmap = Bitmap.createBitmap(mutableBitmap.getWidth(), mutableBitmap.getHeight(), Bitmap.Config.ARGB_8888);
+		
 		Canvas canvas = new Canvas(mutableBitmap);
+		Canvas markerCanvas = new Canvas(markerBitmap);
 		for (int i = 0; i < pos.size(); ++i) {
 			Rect rect = new Rect(pos.get(i).get(0), pos.get(i).get(1), pos.get(i).get(2), pos.get(i).get(3));
 			canvas.drawRect(rect, frame);
 			canvas.drawText(Integer.toString(i), pos.get(i).get(0), pos.get(i).get(1), number);
+			markerCanvas.drawRect(rect, marker);
 		}
+		
 	}
 	
 	private void printPosition() {
