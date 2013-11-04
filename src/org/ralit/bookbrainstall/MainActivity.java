@@ -38,6 +38,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.util.Config;
 import android.util.Log;
+import android.util.TimingLogger;
 import android.view.GestureDetector;
 import android.view.GestureDetector.SimpleOnGestureListener;
 import android.view.MotionEvent;
@@ -83,6 +84,8 @@ public class MainActivity extends Activity implements AnimatorListener{
 	private GestureDetector gesture;
 	AnimatorSet set;
 	private MuPDFCore pdf;
+	private float marginRatio = 0.2f;
+	private float margin;
 	
 	private String RECOGNITION_URL = "https://recognize.jp/v1/scenery/api/line-region";
 	private String API_KEY = "kU10DrMKI3xRnv4RVcxqbR1slGwrfTCsSKoc9A378s";
@@ -128,6 +131,7 @@ public class MainActivity extends Activity implements AnimatorListener{
 			setPosition();
 			Collections.sort(pos, new PositionComparator());
 			deleteDuplicate();
+			expand();
 			paintPosition();
 			savePaintedImage();
 			setimage();
@@ -176,6 +180,35 @@ public class MainActivity extends Activity implements AnimatorListener{
 			return false;
 		}
 	};
+	
+	private void expand() {
+		Log.i(tag, "expand()");
+		TimingLogger timing = new TimingLogger(tag, "timinglogger");
+		
+		int ww = bmp.getWidth();
+		int hh = bmp.getHeight(); 
+		int pixels[] = new int[ww * hh];
+		bmp.getPixels(pixels, 0, ww, 0, 0, ww, hh);
+		timing.addSplit("getpixels");
+		
+		for (int i = 0; i < pos.size(); ++i) {
+			ArrayList<Integer> array = pos.get(i);
+			int y = (array.get(3) + array.get(1)) / 2;
+			int newL = -1;
+			int newR = -1;
+			for (int x = 0; x < array.get(0); ++x) {
+				if(pixels[x + y * ww] == -16777216) { newL = x; break; }
+			}
+			for (int x = ww-1; array.get(2) < x; --x) {
+				if(pixels[x + y * ww] == -16777216) { newR = x; break; }
+			}
+			if (newL != -1) { array.set(0, newL - margin > 0 ? (int)(newL - margin) : 0); }
+			if (newR != -1) { array.set(2, newR + margin < ww ? (int)(newR + margin) : ww-1); }
+		}
+		timing.addSplit("pixel走査");
+		timing.dumpToLog();
+		Log.i(tag, timing.toString());
+	}
 	
 	private void deleteDuplicate() {
 		Log.i(tag, "deleteDuplicate()");
@@ -341,23 +374,23 @@ public class MainActivity extends Activity implements AnimatorListener{
 	private void docomo () {
 		Log.i(tag, "docomo()");
 		
-		File file = new File(Environment.getExternalStorageDirectory().getPath() + "/imagemove/");
-		String attachName = file.getAbsolutePath() + "/" + "file.pdf";
-		try {
-			pdf = new MuPDFCore(this, attachName);
-			int page_max = pdf.countPages();
-			PointF size = new PointF();
-			size = pdf.getPageSize(0);
-			bmp = Bitmap.createBitmap((int)size.x, (int)size.y, android.graphics.Bitmap.Config.ARGB_8888);
-			pdf.drawPage(bmp, 0, (int)size.x, (int)size.y, 0, 0, (int)size.x, (int)size.y);
-		} catch (Exception e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
+//		File file = new File(Environment.getExternalStorageDirectory().getPath() + "/imagemove/");
+//		String attachName = file.getAbsolutePath() + "/" + "file.pdf";
+//		try {
+//			pdf = new MuPDFCore(this, attachName);
+//			int page_max = pdf.countPages();
+//			PointF size = new PointF();
+//			size = pdf.getPageSize(0);
+//			bmp = Bitmap.createBitmap((int)size.x, (int)size.y, android.graphics.Bitmap.Config.ARGB_8888);
+//			pdf.drawPage(bmp, 0, (int)size.x, (int)size.y, 0, 0, (int)size.x, (int)size.y);
+//		} catch (Exception e1) {
+//			// TODO Auto-generated catch block
+//			e1.printStackTrace();
+//		}
 		
-//		options = new BitmapFactory.Options();
-//		options.inScaled = false;
-//		bmp = BitmapFactory.decodeResource(getResources(), com.artifex.mupdfdemo.R.drawable.organic, options);
+		options = new BitmapFactory.Options();
+		options.inScaled = false;
+		bmp = BitmapFactory.decodeResource(getResources(), com.artifex.mupdfdemo.R.drawable.organic, options);
 		ByteArrayOutputStream bos = new ByteArrayOutputStream();
 		bmp.compress(CompressFormat.JPEG, 90, bos);
 		jpegData = bos.toByteArray();
@@ -381,8 +414,7 @@ public class MainActivity extends Activity implements AnimatorListener{
 		for (LineLayout line : job) {
 			Rectangle bounds = line.getShape().getBounds();
 			ArrayList<Integer> internal = new ArrayList<Integer>();
-			float marginRatio = 0.2f;
-			float margin = (bounds.getBottom() - bounds.getTop()) * marginRatio;
+			margin = (bounds.getBottom() - bounds.getTop()) * marginRatio;
 			internal.add(bounds.getLeft() - (int)margin);
 			internal.add(bounds.getTop() - (int)margin);
 			internal.add(bounds.getRight() + (int)margin);
