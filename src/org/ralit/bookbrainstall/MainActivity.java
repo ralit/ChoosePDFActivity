@@ -23,9 +23,7 @@ import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Mat;
-import org.opencv.imgproc.Imgproc;
 
-import android.R.color;
 import android.animation.Animator;
 import android.animation.Animator.AnimatorListener;
 import android.animation.AnimatorSet;
@@ -38,6 +36,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Paint.Style;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Environment;
@@ -142,6 +141,7 @@ public class MainActivity extends Activity implements AnimatorListener{
 			recognize();
 			setPosition();
 			Collections.sort(pos, new PositionComparator());
+			deleteLongcat();
 			deleteDuplicate();
 			expand();
 			paintPosition();
@@ -179,14 +179,44 @@ public class MainActivity extends Activity implements AnimatorListener{
 		@Override
 		public boolean onFling(MotionEvent ev1, MotionEvent ev2, float vx, float vy) {
 				if (ev1.getY() > dH && ev2.getY() > dH) {
-					marker.setColor(Color.RED);
-					marker.setAlpha(64);
-					Rect rect = new Rect(pos.get(index).get(0), pos.get(index).get(1), pos.get(index).get(2), pos.get(index).get(3));
-					markerCanvas.drawRect(rect, marker);
 					float w = (float) mutableBitmap.getWidth();
 					float h = (float) mutableBitmap.getHeight();
-					markedPage = Bitmap.createScaledBitmap(markerBitmap, (int)dW, (int)(dW * (h/w)), false);
-					markerview.setImageBitmap(markedPage);
+
+//					marker.setColor(Color.RED);
+//					marker.setAlpha(64);
+//					Rect rect = new Rect(pos.get(index).get(0), pos.get(index).get(1), pos.get(index).get(2), pos.get(index).get(3));
+//					markerCanvas.drawRect(rect, marker);
+//					markedPage = Bitmap.createScaledBitmap(markerBitmap, (int)dW, (int)(dW * (h/w)), false);
+//					markerview.setImageBitmap(markedPage);
+					
+					// 実際に指を滑らせた位置にマーカーを引く
+					Point screen = new Point();
+					getWindowManager().getDefaultDisplay().getSize(screen);
+					float linemid = (pos.get(index).get(3) + pos.get(index).get(1)) / 2;
+					float realx1 = ev1.getX() * (w / dW);
+					float realy1 = linemid + (w / dW) * (ev1.getY() - (1f/2f) * dH  - (screen.y - dH));
+					float realx2 = ev2.getX() * (w / dW);
+					float realy2 = linemid + (w / dW) * (ev2.getY() - (1f/2f) * dH  - (screen.y - dH));
+					marker.setColor(Color.RED);
+					marker.setAlpha(64);
+					int i = index;
+					int add = 1;
+					Log.i(tag, "i: " + i);
+					while ( 0 <= i && i <= pos.size() ) {
+						Log.i(tag, "i = " + i + ": " + pos.get(i).get(0) + " < " + realx1 + " < " + pos.get(i).get(2) + ", " + pos.get(i).get(1) + " < " + realy1 + " < " + pos.get(i).get(3));
+						if (pos.get(i).get(0) < realx1 && realx1 < pos.get(i).get(2) && pos.get(i).get(1) < realy1 && realy1 < pos.get(i).get(3)) {
+							break;
+						}
+						i += add;
+						add = add > 0 ? -1 * (add+1) : -1 * (add-1);
+					}
+					if ( 0 <= i && i <= pos.size() ) {
+						Rect rect = new Rect((int)realx1, pos.get(i).get(1), (int)realx2, pos.get(i).get(3));
+						markerCanvas.drawRect(rect, marker);
+						markedPage = Bitmap.createScaledBitmap(markerBitmap, (int)dW, (int)(dW * (h/w)), false);
+						markerview.setImageBitmap(markedPage);
+					}
+					
 				} else if (Math.abs(ev1.getY() - ev2.getY()) > 250) { 
 					return false; 
 				} else if (ev2.getX() - ev1.getX() > 120 && Math.abs(vx) > 200) {
@@ -268,6 +298,30 @@ public class MainActivity extends Activity implements AnimatorListener{
 		
 		Mat mat = new Mat();
 		mat.get(hh, ww, pixels);
+	}
+	
+	private void deleteLongcat() {
+		Log.i(tag, "deleteLongcat()");
+		ArrayList<Integer> fatCat = new ArrayList<Integer>();
+		ArrayList<Integer> tallCat = new ArrayList<Integer>();
+		for (int i = 0; i < pos.size(); ++i) {
+			if (pos.get(i).get(2) - pos.get(i).get(0) > pos.get(i).get(3) - pos.get(i).get(1)) {
+				fatCat.add(i);
+			} else {
+				tallCat.add(i);
+			}
+		}
+		if (fatCat.size() >= tallCat.size()) {
+			for (int i = 0; i < tallCat.size(); ++i ) {
+				Log.i(tag, "tallCat: " + tallCat);
+				pos.remove((int)tallCat.get(i));
+			}
+		} else {
+			for (int i = 0; i < fatCat.size(); ++i ) {
+				Log.i(tag, "fatCat: " + fatCat);
+				pos.remove((int)fatCat.get(i));
+			}
+		}
 	}
 	
 	private void deleteDuplicate() {
@@ -465,7 +519,7 @@ public class MainActivity extends Activity implements AnimatorListener{
 		
 		options = new BitmapFactory.Options();
 		options.inScaled = false;
-		bmp = BitmapFactory.decodeResource(getResources(), com.artifex.mupdfdemo.R.drawable.organic, options);
+		bmp = BitmapFactory.decodeResource(getResources(), com.artifex.mupdfdemo.R.drawable.seibutu, options);
 		ByteArrayOutputStream bos = new ByteArrayOutputStream();
 		bmp.compress(CompressFormat.JPEG, 90, bos);
 		jpegData = bos.toByteArray();

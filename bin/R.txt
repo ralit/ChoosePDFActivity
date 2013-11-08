@@ -47,8 +47,9 @@ int drawable recognizing 0x7f02001d
 int drawable search 0x7f02001e
 int drawable seek_progress 0x7f02001f
 int drawable seek_thumb 0x7f020020
-int drawable tiled_background 0x7f020021
-int drawable zisui 0x7f020022
+int drawable seibutu 0x7f020021
+int drawable tiled_background 0x7f020022
+int drawable zisui 0x7f020023
 int id acceptButton 0x7f050022
 int id annotType 0x7f050021
 int id any 0x7f050000
