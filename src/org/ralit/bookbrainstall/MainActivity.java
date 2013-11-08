@@ -37,6 +37,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.graphics.Point;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Environment;
@@ -110,11 +111,8 @@ public class MainActivity extends Activity implements AnimatorListener{
 		Log.i(tag, "onCreate()");
 		super.onCreate(savedInstanceState);
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
-//		getWindow().setFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED, WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 		initRootView();
-//		rootframe.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-//		nowloadingview.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
 	}
 	
 	@Override
@@ -124,12 +122,6 @@ public class MainActivity extends Activity implements AnimatorListener{
 		if (focusChanged) { return; }
 		focusChanged = true;
 		initChildrenView();
-//		linearlayout.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-//		framelayout.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-//		framelayout2.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-//		image.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-//		image2.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-//		overview.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
 		fadeinNowloading();
 	}
 
@@ -151,13 +143,6 @@ public class MainActivity extends Activity implements AnimatorListener{
 			fadeoutNowloading();
 			gesture = new GestureDetector(this, gestureListener);
 			animation();
-			Log.i(tag, "image" + image.isHardwareAccelerated());
-			Log.i(tag, "framelayout" + framelayout.isHardwareAccelerated());
-			Log.i(tag, "rootframe" + rootframe.isHardwareAccelerated());
-			Log.i(tag, "image" + image.getLayerType());
-			Log.i(tag, "framelayout" + framelayout.getLayerType());
-			Log.i(tag, "rootframe" + rootframe.getLayerType());
-			
 		} else {
 			if (!back) { ++index; }
 			back = false;
@@ -179,53 +164,20 @@ public class MainActivity extends Activity implements AnimatorListener{
 		@Override
 		public boolean onFling(MotionEvent ev1, MotionEvent ev2, float vx, float vy) {
 				if (ev1.getY() > dH && ev2.getY() > dH) {
-					float w = (float) mutableBitmap.getWidth();
-					float h = (float) mutableBitmap.getHeight();
-
-//					marker.setColor(Color.RED);
-//					marker.setAlpha(64);
-//					Rect rect = new Rect(pos.get(index).get(0), pos.get(index).get(1), pos.get(index).get(2), pos.get(index).get(3));
-//					markerCanvas.drawRect(rect, marker);
-//					markedPage = Bitmap.createScaledBitmap(markerBitmap, (int)dW, (int)(dW * (h/w)), false);
-//					markerview.setImageBitmap(markedPage);
-					
-					// 実際に指を滑らせた位置にマーカーを引く
-					Point screen = new Point();
-					getWindowManager().getDefaultDisplay().getSize(screen);
-					float linemid = (pos.get(index).get(3) + pos.get(index).get(1)) / 2;
-					float realx1 = ev1.getX() * (w / dW);
-					float realy1 = linemid + (w / dW) * (ev1.getY() - (1f/2f) * dH  - (screen.y - dH));
-					float realx2 = ev2.getX() * (w / dW);
-					float realy2 = linemid + (w / dW) * (ev2.getY() - (1f/2f) * dH  - (screen.y - dH));
-					marker.setColor(Color.RED);
-					marker.setAlpha(64);
-					int i = index;
-					int add = 1;
-					Log.i(tag, "i: " + i);
-					while ( 0 <= i && i <= pos.size() ) {
-						Log.i(tag, "i = " + i + ": " + pos.get(i).get(0) + " < " + realx1 + " < " + pos.get(i).get(2) + ", " + pos.get(i).get(1) + " < " + realy1 + " < " + pos.get(i).get(3));
-						if (pos.get(i).get(0) < realx1 && realx1 < pos.get(i).get(2) && pos.get(i).get(1) < realy1 && realy1 < pos.get(i).get(3)) {
-							break;
-						}
-						i += add;
-						add = add > 0 ? -1 * (add+1) : -1 * (add-1);
-					}
-					if ( 0 <= i && i <= pos.size() ) {
-						Rect rect = new Rect((int)realx1, pos.get(i).get(1), (int)realx2, pos.get(i).get(3));
-						markerCanvas.drawRect(rect, marker);
-						markedPage = Bitmap.createScaledBitmap(markerBitmap, (int)dW, (int)(dW * (h/w)), false);
-						markerview.setImageBitmap(markedPage);
-					}
-					
+					// 蛍光ペン
+					mark(ev1, ev2);
 				} else if (Math.abs(ev1.getY() - ev2.getY()) > 250) { 
+					// 無視
 					return false; 
 				} else if (ev2.getX() - ev1.getX() > 120 && Math.abs(vx) > 200) {
+					// 1行戻る
 					back = true;
 					if (set.getChildAnimations().get(0).isRunning()) { 
 						if (index > 0) { --index; }
 					}
 					set.cancel();
 				} else if (ev1.getX() - ev2.getX() > 120 && Math.abs(vx) > 200) {
+					// 1行進む
 					set.cancel();
 				}
 			return false;
@@ -254,6 +206,37 @@ public class MainActivity extends Activity implements AnimatorListener{
 		}
 	};
 
+	private void mark(MotionEvent ev1, MotionEvent ev2) {
+		float w = (float) mutableBitmap.getWidth();
+		float h = (float) mutableBitmap.getHeight();					
+		// 実際に指を滑らせた位置にマーカーを引く
+		Point screen = new Point();
+		getWindowManager().getDefaultDisplay().getSize(screen);
+		float linemid = (pos.get(index).get(3) + pos.get(index).get(1)) / 2;
+		float realx1 = ev1.getX() * (w / dW);
+		float realy1 = linemid + (w / dW) * (ev1.getY() - (1f/2f) * dH  - (screen.y - dH));
+		float realx2 = ev2.getX() * (w / dW);
+		float realy2 = linemid + (w / dW) * (ev2.getY() - (1f/2f) * dH  - (screen.y - dH));
+		marker.setColor(Color.RED);
+		marker.setAlpha(64);
+		int i = index;
+		int add = 1;
+		Log.i(tag, "i: " + i);
+		while ( 0 <= i && i <= pos.size() ) {
+			Log.i(tag, "i = " + i + ": " + pos.get(i).get(0) + " < " + realx1 + " < " + pos.get(i).get(2) + ", " + pos.get(i).get(1) + " < " + realy1 + " < " + pos.get(i).get(3));
+			if (pos.get(i).get(0) < realx1 && realx1 < pos.get(i).get(2) && pos.get(i).get(1) < realy1 && realy1 < pos.get(i).get(3)) {
+				break;
+			}
+			i += add;
+			add = add > 0 ? -1 * (add+1) : -1 * (add-1);
+		}
+		if ( 0 <= i && i <= pos.size() ) {
+			Rect rect = new Rect((int)realx1, pos.get(i).get(1), (int)realx2, pos.get(i).get(3));
+			markerCanvas.drawRect(rect, marker);
+			markedPage = Bitmap.createScaledBitmap(markerBitmap, (int)dW, (int)(dW * (h/w)), false);
+			markerview.setImageBitmap(markedPage);
+		}
+	}
 
 	private void expand() {
 		Log.i(tag, "expand()");
@@ -290,31 +273,21 @@ public class MainActivity extends Activity implements AnimatorListener{
 		Log.i(tag, timing.toString());
 	}
 	
-	private void expandcv() {
-		int ww = bmp.getWidth();
-		int hh = bmp.getHeight(); 
-		int pixels[] = new int[ww * hh];
-		bmp.getPixels(pixels, 0, ww, 0, 0, ww, hh);
-		
-		Mat mat = new Mat();
-		mat.get(hh, ww, pixels);
-	}
-	
 	private void deleteLongcat() {
 		Log.i(tag, "deleteLongcat()");
 		ArrayList<Integer> fatCat = new ArrayList<Integer>();
-		ArrayList<Integer> tallCat = new ArrayList<Integer>();
+		ArrayList<Integer> longCat = new ArrayList<Integer>();
 		for (int i = 0; i < pos.size(); ++i) {
 			if (pos.get(i).get(2) - pos.get(i).get(0) > pos.get(i).get(3) - pos.get(i).get(1)) {
 				fatCat.add(i);
 			} else {
-				tallCat.add(i);
+				longCat.add(i);
 			}
 		}
-		if (fatCat.size() >= tallCat.size()) {
-			for (int i = 0; i < tallCat.size(); ++i ) {
-				Log.i(tag, "tallCat: " + tallCat);
-				pos.remove((int)tallCat.get(i));
+		if (fatCat.size() >= longCat.size()) {
+			for (int i = 0; i < longCat.size(); ++i ) {
+				Log.i(tag, "longCat: " + longCat);
+				pos.remove((int)longCat.get(i));
 			}
 		} else {
 			for (int i = 0; i < fatCat.size(); ++i ) {
@@ -437,11 +410,11 @@ public class MainActivity extends Activity implements AnimatorListener{
 		cW = (pos.get(index).get(2) - pos.get(index).get(0));
 		cH = (pos.get(index).get(3) - pos.get(index).get(1));
 		textZoom = dH / (cH * (dW/cW));
-		Log.i("dH", Float.toString(dH));
-		Log.i("dW", Float.toString(dW));
-		Log.i("cW", Float.toString(cW));
-		Log.i("cH", Float.toString(cH));
-		Log.i("textZoom", Float.toString(textZoom));
+//		Log.i("dH", Float.toString(dH));
+//		Log.i("dW", Float.toString(dW));
+//		Log.i("cW", Float.toString(cW));
+//		Log.i("cH", Float.toString(cH));
+//		Log.i("textZoom", Float.toString(textZoom));
 	}
 	
 	public void setimage() {
@@ -499,30 +472,38 @@ public class MainActivity extends Activity implements AnimatorListener{
 		}
 
 	}
-		
-	private void docomo () {
-		Log.i(tag, "docomo()");
-		
-//		File file = new File(Environment.getExternalStorageDirectory().getPath() + "/imagemove/");
-//		String attachName = file.getAbsolutePath() + "/" + "file.pdf";
-//		try {
-//			pdf = new MuPDFCore(this, attachName);
-//			int page_max = pdf.countPages();
-//			PointF size = new PointF();
-//			size = pdf.getPageSize(0);
-//			bmp = Bitmap.createBitmap((int)size.x, (int)size.y, android.graphics.Bitmap.Config.ARGB_8888);
-//			pdf.drawPage(bmp, 0, (int)size.x, (int)size.y, 0, 0, (int)size.x, (int)size.y);
-//		} catch (Exception e1) {
-//			// TODO Auto-generated catch block
-//			e1.printStackTrace();
-//		}
-		
+	
+	private void openPDF() {
+		File file = new File(Environment.getExternalStorageDirectory().getPath() + "/imagemove/");
+		String attachName = file.getAbsolutePath() + "/" + "file.pdf";
+		try {
+			pdf = new MuPDFCore(this, attachName);
+			int page_max = pdf.countPages();
+			PointF size = new PointF();
+			size = pdf.getPageSize(0);
+			bmp = Bitmap.createBitmap((int)size.x, (int)size.y, android.graphics.Bitmap.Config.ARGB_8888);
+			pdf.drawPage(bmp, 0, (int)size.x, (int)size.y, 0, 0, (int)size.x, (int)size.y);
+			ByteArrayOutputStream bos = new ByteArrayOutputStream();
+			bmp.compress(CompressFormat.JPEG, 90, bos);
+			jpegData = bos.toByteArray();
+		} catch (Exception e1) {
+			e1.printStackTrace();
+		}
+	}
+	
+	private void openResource() {
 		options = new BitmapFactory.Options();
 		options.inScaled = false;
 		bmp = BitmapFactory.decodeResource(getResources(), com.artifex.mupdfdemo.R.drawable.seibutu, options);
 		ByteArrayOutputStream bos = new ByteArrayOutputStream();
 		bmp.compress(CompressFormat.JPEG, 90, bos);
 		jpegData = bos.toByteArray();
+	}
+		
+	private void docomo () {
+		Log.i(tag, "docomo()");
+		openPDF();
+//		openResource();
 		
 		try {
 			SceneryLineLayoutAnalyzer analyzer;
